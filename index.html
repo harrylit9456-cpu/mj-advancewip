@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MJ Advance WIP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: {
+                            50: '#fbf9f2',
+                            100: '#f5efde',
+                            200: '#ebdbbf',
+                            300: '#dabf93',
+                            400: '#c5a059',
+                            500: '#b48a43',
+                            600: '#9d6f37',
+                            700: '#83572f',
+                            800: '#6d482c',
+                            900: '#5c3e28',
+                        },
+                        navy: {
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .kanban-container::-webkit-scrollbar, .gantt-container::-webkit-scrollbar { height: 6px; width: 6px; }
+        .kanban-container::-webkit-scrollbar-track, .gantt-container::-webkit-scrollbar-track { background: rgba(0,0,0,0.03); }
+        .kanban-container::-webkit-scrollbar-thumb, .gantt-container::-webkit-scrollbar-thumb { background: #dabf93; border-radius: 10px; }
+        
+        .glass-header {
+            backdrop-filter: blur(12px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .dark .glass-header {
+            background: rgba(15, 23, 42, 0.98);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px -4px rgba(180, 138, 67, 0.3);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+        }
+
+        .delayed-pulse {
+            animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .7; }
+        }
+
+        .gantt-row {
+            display: flex;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            min-height: 44px;
+        }
+        .dark .gantt-row { border-bottom-color: rgba(255,255,255,0.06); }
+        
+        .gantt-cell {
+            flex-shrink: 0;
+            width: 48px;
+            border-right: 1px solid rgba(0,0,0,0.04);
+        }
+        .dark .gantt-cell { border-right-color: rgba(255,255,255,0.04); }
+        .gantt-today { background: rgba(180, 138, 67, 0.08); border-left: 1px solid #b48a43 !important; }
+        .gantt-holiday { background: rgba(239, 68, 68, 0.04); }
+        .dark .gantt-holiday { background: rgba(239, 68, 68, 0.02); }
+
+        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+        .dark input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+        .collapsed-column {
+            width: 40px !important;
+            min-width: 40px !important;
+        }
+        .vertical-text {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+        }
+        
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 transition-colors duration-200 min-h-screen font-sans dark:bg-navy-950 dark:text-white text-[11px]">
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-100 dark:bg-navy-950">
+        <div class="max-w-sm w-full p-8 rounded-[2rem] shadow-2xl border bg-white border-slate-200 dark:bg-navy-900 dark:border-gold-900/30 relative text-center">
+            <button onclick="toggleTheme()" class="absolute top-6 right-6 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-navy-800 dark:text-gold-400 transition-colors">
+                <i id="theme-icon-login" data-lucide="moon" class="w-5 h-5"></i>
+            </button>
+            <div class="flex flex-col items-center mb-8 text-center">
+                <div class="bg-gold-500 p-4 rounded-2xl mb-4 text-white shadow-lg">
+                    <i data-lucide="gem" class="w-8 h-8"></i>
+                </div>
+                <h1 class="text-xl font-black tracking-tight dark:text-white uppercase text-slate-900 dark:text-white">MJ Advance <span class="text-gold-500">WIP</span></h1>
+                <p class="text-[9px] font-black text-slate-400 dark:text-gold-500/50 mt-1 uppercase tracking-[0.2em]">Management Intelligence</p>
+            </div>
+            <form id="login-form" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-[9px] font-black uppercase tracking-widest mb-1.5 text-slate-500 dark:text-gold-400">Identity</label>
+                    <input type="text" id="username" class="w-full p-2.5 rounded-xl border border-slate-200 focus:ring-1 focus:ring-gold-500 outline-none bg-slate-50 dark:bg-navy-800 dark:border-navy-700 font-bold" required>
+                </div>
+                <div>
+                    <label class="block text-[9px] font-black uppercase tracking-widest mb-1.5 text-slate-500 dark:text-gold-400">Passphrase</label>
+                    <input type="password" id="password" class="w-full p-3 rounded-xl border border-slate-200 focus:ring-1 focus:ring-gold-500 outline-none bg-slate-50 dark:bg-navy-800 dark:border-navy-700 font-bold" required>
+                </div>
+                <p id="login-error" class="text-red-600 text-[9px] font-black hidden text-center italic uppercase tracking-tighter">Auth Failed.</p>
+                <button type="submit" class="w-full bg-gold-600 hover:bg-gold-700 text-white font-black py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest active:scale-95">
+                    Log In <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App UI -->
+    <div id="app-ui" class="hidden">
+        <header class="sticky top-0 z-50 border-b glass-header border-slate-200 dark:border-navy-800">
+            <div class="max-w-[2400px] mx-auto px-6 h-14 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="bg-gold-500 p-1.5 rounded-lg text-white">
+                        <i data-lucide="gem" class="w-4 h-4"></i>
+                    </div>
+                    <h2 class="font-black text-sm tracking-tighter text-slate-900 dark:text-white uppercase leading-none hidden sm:block">MJ Advance <span class="text-gold-500">WIP</span></h2>
+                </div>
+
+                <div class="flex-1 max-w-lg px-6 flex items-center gap-4">
+                    <div class="relative group flex-1">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-gold-500 transition-colors w-3.5 h-3.5"></i>
+                        <input type="text" id="search-input" placeholder="Search job, client or product..." 
+                               class="w-full pl-9 pr-4 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 focus:bg-white outline-none focus:ring-1 focus:ring-gold-500 transition-all dark:bg-navy-800 dark:border-navy-700 dark:text-white font-bold text-[10px]">
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer group whitespace-nowrap">
+                        <input type="checkbox" id="show-shipped-checkbox" class="w-4 h-4 rounded text-gold-600 focus:ring-gold-500 border-slate-300 dark:border-navy-700">
+                        <span class="text-[9px] font-black uppercase text-slate-500 dark:text-slate-400 group-hover:text-gold-500 transition-colors">Show Shipped</span>
+                    </label>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <div class="flex bg-slate-100 dark:bg-navy-800 p-1 rounded-lg">
+                        <button id="view-kanban" onclick="setView('kanban')" class="px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 bg-white dark:bg-gold-600 shadow-sm dark:text-white">
+                            <i data-lucide="columns" class="w-3 h-3"></i> Kanban
+                        </button>
+                        <button id="view-gantt" onclick="setView('gantt')" class="px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                            <i data-lucide="gantt-chart" class="w-3 h-3"></i> Gantt
+                        </button>
+                        <button id="view-calendar" onclick="setView('calendar')" class="px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                            <i data-lucide="calendar" class="w-3 h-3"></i> Shipping
+                        </button>
+                    </div>
+                    <button onclick="toggleModal('report-modal', true)" class="p-2 rounded-lg bg-slate-100 dark:bg-navy-800 text-slate-700 dark:text-gold-400 hover:bg-slate-200 transition-colors" title="Reports">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="toggleModal('product-modal', true)" class="bg-navy-950 dark:bg-gold-600 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-sm">
+                        Add Job
+                    </button>
+                    <div class="w-px h-6 bg-slate-200 dark:bg-navy-800 mx-1"></div>
+                    <button onclick="toggleTheme()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-navy-800 transition-colors">
+                        <i id="theme-icon-main" data-lucide="moon" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="logout()" class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="p-4">
+            <!-- Kanban View -->
+            <div id="kanban-view" class="kanban-container overflow-x-auto">
+                <div id="kanban-board" class="flex gap-4 min-w-max pb-6"></div>
+            </div>
+
+            <!-- Gantt View -->
+            <div id="gantt-view" class="hidden">
+                <div class="flex items-center justify-between mb-3 px-1">
+                    <div class="flex items-center gap-6">
+                        <div class="flex items-center gap-3">
+                            <h3 id="gantt-month-year" class="text-xl font-black dark:text-white uppercase">January 2024</h3>
+                            <div class="flex gap-2">
+                                <button onclick="changeGanttMonth(-1)" class="p-1.5 rounded-lg border dark:border-navy-700 hover:bg-gold-50 dark:hover:bg-navy-800 transition-all"><i data-lucide="chevron-left" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="changeGanttMonth(1)" class="p-1.5 rounded-lg border dark:border-navy-700 hover:bg-gold-50 dark:hover:bg-navy-800 transition-all"><i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <select id="gantt-client-filter" onchange="handleGanttClientFilter(this.value)" 
+                                    class="bg-white dark:bg-navy-800 border dark:border-navy-700 rounded-lg text-[8px] font-black uppercase px-3 py-1 outline-none focus:ring-1 focus:ring-gold-500 text-slate-900 dark:text-white">
+                                <option value="">All Accounts</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-navy-900 rounded-xl border dark:border-navy-800 overflow-hidden shadow-xl">
+                    <div class="flex overflow-x-auto gantt-container" id="gantt-scroll-container">
+                        <div class="w-48 flex-shrink-0 bg-slate-50 dark:bg-navy-900/50 border-r dark:border-navy-800 sticky left-0 z-20">
+                            <div class="h-12 border-b dark:border-navy-800 flex items-center px-4">
+                                <span class="text-[9px] font-black uppercase text-slate-400">Production Queue</span>
+                            </div>
+                            <div id="gantt-sidebar"></div>
+                        </div>
+                        <div class="flex-1">
+                            <div id="gantt-header" class="h-12 flex border-b dark:border-navy-800 bg-white dark:bg-navy-900 relative"></div>
+                            <div id="gantt-body"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calendar View -->
+            <div id="calendar-view" class="hidden max-w-[98%] mx-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-4">
+                        <h3 id="calendar-month-year" class="text-xl font-black dark:text-white uppercase">January 2024</h3>
+                        <select id="calendar-client-filter" onchange="handleCalendarClientFilter(this.value)" 
+                                class="bg-white dark:bg-navy-800 border dark:border-navy-700 rounded-lg text-[9px] font-black uppercase px-3 py-1.5 outline-none focus:ring-1 focus:ring-gold-500 text-slate-900 dark:text-white">
+                            <option value="">All Accounts</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="changeMonth(-1)" class="p-2 rounded-lg border dark:border-navy-700 hover:bg-gold-50 transition-all"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                        <button onclick="changeMonth(1)" class="p-2 rounded-lg border dark:border-navy-700 hover:bg-gold-50 transition-all"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                    </div>
+                </div>
+                <div class="rounded-xl border dark:border-navy-800 bg-white dark:bg-navy-900 overflow-hidden shadow-lg">
+                    <div class="calendar-grid bg-slate-50 dark:bg-navy-800/50 border-b dark:border-navy-800">
+                        <div class="py-2 text-center text-[9px] font-black uppercase text-red-500 bg-red-50/50 dark:bg-red-950/10">Sun</div>
+                        <div class="py-2 text-center text-[9px] font-black uppercase text-slate-400">Mon</div>
+                        <div class="py-2 text-center text-[9px] font-black uppercase text-slate-400">Tue</div>
+                        <div class="py-2 text-center text-[9px] font-black uppercase text-slate-400">Wed</div>
+                        <div class="py-2 text-center text-[9px] font-black uppercase text-slate-400">Thu</div>
+                        <div class="py-2 text-center text-[9px] font-black uppercase text-slate-400">Fri</div>
+                        <div class="py-2 text-center text-[9px] font-black uppercase text-slate-400">Sat</div>
+                    </div>
+                    <div id="calendar-days" class="calendar-grid"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Analytics Modal -->
+    <div id="report-modal" class="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md hidden">
+        <div class="w-full max-w-xl bg-white dark:bg-navy-900 rounded-2xl shadow-2xl overflow-hidden border dark:border-navy-800">
+            <div class="p-5 border-b dark:border-navy-800 flex justify-between items-center">
+                <h2 class="text-xs font-black dark:text-white uppercase tracking-widest flex items-center gap-2">
+                    <i data-lucide="bar-chart-3" class="text-gold-500"></i> Operation Statistics
+                </h2>
+                <button onclick="toggleModal('report-modal', false)" class="p-1 hover:bg-slate-100 dark:hover:bg-navy-800 rounded-lg transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="report-content" class="p-6 max-h-[70vh] overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Product Detail Modal -->
+    <div id="detail-modal" class="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md hidden">
+        <div class="w-full max-w-4xl bg-white dark:bg-navy-900 rounded-3xl shadow-2xl overflow-hidden border dark:border-navy-800">
+            <div id="detail-content"></div>
+        </div>
+    </div>
+
+    <!-- Job Creation Modal -->
+    <div id="product-modal" class="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-md hidden">
+        <div class="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl bg-white dark:bg-navy-900 border dark:border-navy-800">
+            <div class="sticky top-0 p-5 border-b z-10 flex items-center justify-between bg-white dark:bg-navy-900 backdrop-blur-sm dark:border-navy-800">
+                <h2 class="text-xs font-black dark:text-white uppercase tracking-widest">Register New Entry</h2>
+                <button onclick="toggleModal('product-modal', false)" class="p-2 hover:bg-slate-100 dark:hover:bg-navy-800 rounded-lg transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="product-form" class="p-6 space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-1">
+                        <div id="image-dropzone" class="aspect-[4/5] rounded-xl border-2 border-dashed border-slate-200 dark:border-navy-700 flex flex-col items-center justify-center bg-slate-50 dark:bg-navy-800/50 hover:border-gold-500 transition-colors cursor-pointer group relative">
+                            <div id="image-preview-container" class="hidden w-full h-full p-1.5">
+                                <img id="image-preview" src="" class="w-full h-full object-cover rounded-lg shadow-md">
+                                <button type="button" onclick="clearImage()" class="absolute top-3 right-3 bg-red-500 p-1.5 rounded-lg text-white shadow-lg"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                            <label id="upload-label" class="cursor-pointer flex flex-col items-center gap-2">
+                                <i data-lucide="camera" class="w-6 h-6 text-gold-500"></i>
+                                <span class="font-black uppercase text-[9px] tracking-widest opacity-60">Add Photo</span>
+                                <input type="file" id="image-input" class="hidden" accept="image/*">
+                            </label>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-900 dark:text-white">
+                        <div class="space-y-3">
+                            <div><label class="block font-black uppercase text-slate-400 mb-0.5">Job ID</label><input type="number" id="field-jobNo" required class="w-full p-2 rounded-lg border dark:bg-navy-800 dark:border-navy-700 outline-none font-bold"></div>
+                            <div><label class="block font-black uppercase text-slate-400 mb-0.5">Product Name</label><input type="text" id="field-productName" required class="w-full p-2 rounded-lg border dark:bg-navy-800 dark:border-navy-700 outline-none font-bold"></div>
+                            <div><label class="block font-black uppercase text-slate-400 mb-0.5">Remarks</label><textarea id="field-remark" rows="2" class="w-full p-2 rounded-lg border dark:bg-navy-800 dark:border-navy-700 outline-none font-bold"></textarea></div>
+                            <div><label class="block font-black uppercase text-slate-400 mb-0.5">Start Dept</label><select id="field-startDepartment" class="w-full p-2 rounded-lg border dark:bg-navy-800 dark:border-navy-700 font-bold uppercase"></select></div>
+                        </div>
+                        <div class="space-y-3">
+                            <div><label class="block font-black uppercase text-slate-400 mb-0.5">Client</label><input type="text" id="field-client" required class="w-full p-2 rounded-lg border dark:bg-navy-800 dark:border-navy-700 outline-none font-bold"></div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div><label class="block font-black uppercase text-slate-400 mb-0.5">Gold Carat</label><select id="field-goldKt" class="w-full p-2 rounded-lg border dark:bg-navy-800 font-bold"><option>10KT</option><option>14KT</option><option selected>18KT</option></select></div>
+                                <div><label class="block font-black uppercase text-slate-400 mb-0.5">Dia Class</label><select id="field-diamondType" class="w-full p-2 rounded-lg border dark:bg-navy-800 font-bold"><option>Natural</option><option>CVD</option></select></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div><label class="block font-black uppercase text-slate-400 mb-0.5">Express</label><select id="field-isExpress" class="w-full p-2 rounded-lg border dark:bg-navy-800 font-bold"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                                <div><label class="block font-black uppercase text-slate-400 mb-0.5">Final Date</label><input type="date" id="field-shippingDate" class="w-full p-2 rounded-lg border dark:bg-navy-800 font-bold"></div>
+                            </div>
+                            <div><label class="block font-black uppercase text-slate-400 mb-0.5">Design Master</label><input type="text" id="field-designMaster" class="w-full p-2 rounded-lg border dark:bg-navy-800 font-bold"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="border-t dark:border-navy-800 pt-4">
+                    <h3 class="text-[9px] font-black uppercase text-gold-600 mb-3 tracking-widest">Workflow Targets</h3>
+                    <div id="deadline-inputs" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5"></div>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="toggleModal('product-modal', false)" class="px-5 py-2 rounded-lg bg-slate-100 dark:bg-navy-800 font-black uppercase tracking-widest transition-colors">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-gold-600 hover:bg-gold-700 text-white rounded-lg font-black uppercase tracking-widest shadow-lg">Confirm</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Minimal Transfer Confirm Modal -->
+    <div id="confirm-modal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm hidden text-center">
+        <div class="w-full max-w-[280px] p-6 rounded-2xl shadow-2xl bg-white dark:bg-navy-900 border border-slate-100 dark:border-navy-800 text-center">
+            <h3 class="text-xs font-black uppercase text-slate-400 mb-4 tracking-widest">Transfer Step</h3>
+            <div id="move-modal-target" class="mb-5 p-3 rounded-xl bg-gold-500/5 text-gold-600 font-black text-[11px] uppercase border border-gold-500/10"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="cancelMove()" class="py-2.5 rounded-xl bg-slate-50 dark:bg-navy-800 font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase text-[9px]">Cancel</button>
+                <button onclick="executeMove()" class="py-2.5 bg-gold-600 text-white rounded-xl font-black shadow-lg shadow-gold-500/20 uppercase text-[9px]">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STAGES = ["RPT", "Casting", "Filing-Assembling", "RB, CT, Dia Size", "Diamond Procurement", "Setting", "Fitting and Polish", "Rhodium and After finish", "Meena", "Quality Control"];
+
+        let state = {
+            products: JSON.parse(localStorage.getItem('erp_products_v6')) || [],
+            isDarkMode: localStorage.getItem('erp_theme') !== 'light',
+            currentUser: null,
+            searchQuery: '',
+            currentView: 'kanban',
+            calendarDate: new Date(),
+            ganttDate: new Date(),
+            calendarClientFilter: '',
+            ganttClientFilter: '',
+            pendingMove: null,
+            productImage: null,
+            collapsedStages: JSON.parse(localStorage.getItem('erp_collapsed_v1')) || [],
+            expandedEmptyStages: JSON.parse(localStorage.getItem('erp_exp_empty_v1')) || [],
+            showShipped: false
+        };
+
+        function initApp() {
+            const startDeptSelect = document.getElementById('field-startDepartment');
+            const deadlineContainer = document.getElementById('deadline-inputs');
+            
+            if(startDeptSelect) {
+                startDeptSelect.innerHTML = STAGES.map(s => `<option value="${s}">${s}</option>`).join('');
+            }
+
+            if(deadlineContainer) {
+                deadlineContainer.innerHTML = STAGES.map(s => {
+                    const safeId = s.replace(/[^a-zA-Z0-9]/g, '');
+                    return `
+                    <div class="flex flex-col gap-1 p-2.5 rounded-lg bg-slate-50 dark:bg-navy-800/50 border dark:border-navy-700">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" checked id="check-${safeId}" class="w-3.5 h-3.5 rounded text-gold-600">
+                            <label class="text-[8px] font-black uppercase text-slate-500 dark:text-gold-500 truncate" for="check-${safeId}">${s}</label>
+                        </div>
+                        <input type="date" id="deadline-${safeId}" class="w-full p-1.5 rounded-md bg-white dark:bg-navy-900 border dark:border-navy-700 text-[9px] font-bold outline-none">
+                    </div>`;
+                }).join('');
+            }
+
+            const showShippedCheckbox = document.getElementById('show-shipped-checkbox');
+            if (showShippedCheckbox) {
+                showShippedCheckbox.addEventListener('change', (e) => {
+                    state.showShipped = e.target.checked;
+                    refreshCurrentView();
+                });
+            }
+            
+            applyTheme();
+            lucide.createIcons();
+        }
+
+        function refreshCurrentView() {
+            if (state.currentView === 'kanban') renderBoard();
+            else if (state.currentView === 'gantt') renderGantt();
+            else renderCalendar();
+        }
+
+        function toggleStageCollapse(stage, hasProducts) {
+            if (hasProducts) {
+                const idx = state.collapsedStages.indexOf(stage);
+                if (idx > -1) state.collapsedStages.splice(idx, 1);
+                else state.collapsedStages.push(stage);
+                localStorage.setItem('erp_collapsed_v1', JSON.stringify(state.collapsedStages));
+            } else {
+                const idx = state.expandedEmptyStages.indexOf(stage);
+                if (idx > -1) state.expandedEmptyStages.splice(idx, 1);
+                else state.expandedEmptyStages.push(stage);
+                localStorage.setItem('erp_exp_empty_v1', JSON.stringify(state.expandedEmptyStages));
+            }
+            renderBoard();
+        }
+
+        function setView(view) {
+            state.currentView = view;
+            ['kanban-view', 'calendar-view', 'gantt-view'].forEach(v => {
+                const el = document.getElementById(v);
+                if(el) el.classList.add('hidden');
+            });
+            ['view-kanban', 'view-calendar', 'view-gantt'].forEach(b => {
+                const btn = document.getElementById(b);
+                if(btn) {
+                    btn.classList.remove('bg-white', 'dark:bg-gold-600', 'shadow-sm', 'dark:text-white');
+                    btn.classList.add('text-slate-500', 'dark:text-slate-400');
+                }
+            });
+
+            const activeView = document.getElementById(`${view}-view`);
+            if(activeView) activeView.classList.remove('hidden');
+            
+            const activeBtn = document.getElementById(`view-${view}`);
+            if(activeBtn) {
+                activeBtn.classList.add('bg-white', 'dark:bg-gold-600', 'shadow-sm', 'dark:text-white');
+                activeBtn.classList.remove('text-slate-500', 'dark:text-slate-400');
+            }
+
+            if (view === 'kanban') renderBoard();
+            else if (view === 'calendar') { populateClientFilters(); renderCalendar(); }
+            else if (view === 'gantt') { populateClientFilters(); renderGantt(); }
+            lucide.createIcons();
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('kanban-board');
+            if(!board) return;
+            board.innerHTML = '';
+            
+            const filtered = state.products.filter(p => {
+                const q = state.searchQuery.toLowerCase();
+                const matchesSearch = p.productName.toLowerCase().includes(q) || p.jobNo.toString().includes(q) || p.client.toLowerCase().includes(q);
+                const matchesShipped = state.showShipped || !p.shipped;
+                return matchesSearch && matchesShipped;
+            });
+
+            STAGES.forEach(stage => {
+                const stageProducts = filtered.filter(p => p.currentStage === stage);
+                const isCollapsed = (stageProducts.length > 0 && state.collapsedStages.includes(stage)) || 
+                                   (stageProducts.length === 0 && !state.expandedEmptyStages.includes(stage));
+                
+                const col = document.createElement('div');
+                
+                if (isCollapsed) {
+                    col.className = 'collapsed-column flex flex-col rounded-2xl overflow-hidden bg-slate-200/30 dark:bg-navy-900/30 border dark:border-navy-800 cursor-pointer hover:bg-gold-500/5 transition-all';
+                    col.onclick = () => toggleStageCollapse(stage, stageProducts.length > 0);
+                    col.innerHTML = `<div class="h-full flex flex-col items-center py-5 gap-6">
+                        <span class="text-[8px] font-black px-1.5 py-0.5 rounded-full ${stageProducts.length > 0 ? 'bg-gold-500' : 'bg-slate-300 dark:bg-navy-800'} text-white shadow-sm">${stageProducts.length}</span>
+                        <h3 class="vertical-text font-black text-[9px] uppercase tracking-widest text-slate-500 dark:text-gold-500 whitespace-nowrap">${stage}</h3>
+                    </div>`;
+                } else {
+                    col.className = 'w-72 flex flex-col rounded-2xl overflow-hidden bg-slate-200/30 dark:bg-navy-900/30 border dark:border-navy-800 shadow-sm transition-all';
+                    col.style.minHeight = 'calc(100vh - 160px)';
+                    col.innerHTML = `
+                        <div class="p-3 flex items-center justify-between border-b dark:border-navy-800 bg-white/70 dark:bg-navy-900/70 backdrop-blur-sm">
+                            <div class="flex items-center gap-2">
+                                <button onclick="toggleStageCollapse('${stage}', ${stageProducts.length > 0})" class="p-1 hover:bg-slate-100 dark:hover:bg-navy-800 rounded transition-colors"><i data-lucide="chevron-left" class="w-3.5 h-3.5 text-slate-400"></i></button>
+                                <h3 class="font-black text-[10px] uppercase text-slate-700 dark:text-gold-500 tracking-tight">${stage}</h3>
+                            </div>
+                            <span class="text-[8px] font-black px-2 py-0.5 rounded bg-white dark:bg-navy-800 dark:border-navy-700 border shadow-xs">${stageProducts.length}</span>
+                        </div>
+                        <div class="p-2.5 flex-1 space-y-3 overflow-y-auto" ondragover="event.preventDefault()" ondrop="initiateMove(event.dataTransfer.getData('productId'), '${stage}')">
+                            ${stageProducts.map(p => {
+                                const delayed = isStageDelayed(p);
+                                return `
+                                <div draggable="true" ondragstart="event.dataTransfer.setData('productId', '${p.id}')" onclick="showProductDetails('${p.id}')" 
+                                     class="p-3 rounded-xl bg-white dark:bg-navy-900 border ${p.isExpress === 'Yes' ? 'border-red-600/30 shadow-sm shadow-red-600/5' : 'border-slate-100 dark:border-navy-800'} card-hover transition-all cursor-pointer relative group text-left">
+                                    ${delayed ? '<div class="absolute top-0 right-0 p-1 bg-red-600 text-white rounded-bl-lg shadow-sm"><i data-lucide="clock" class="w-3 h-3"></i></div>' : ''}
+                                    <div class="flex items-center gap-1.5 mb-2.5">
+                                        ${p.isExpress === 'Yes' ? '<span class="text-[6px] font-black px-1.5 py-0.5 rounded bg-red-600 text-white uppercase tracking-widest shadow-xs">Express</span>' : ''}
+                                        <span class="text-[6px] font-black px-1.5 py-0.5 rounded bg-gold-500/10 text-gold-600 dark:bg-gold-500/20 uppercase shadow-xs">#${p.jobNo}</span>
+                                        ${p.shipped ? '<span class="text-[6px] font-black px-1.5 py-0.5 rounded bg-green-500 text-white uppercase tracking-widest shadow-xs">Shipped</span>' : ''}
+                                    </div>
+                                    <div class="flex gap-2.5">
+                                        <div class="w-10 h-10 rounded-lg bg-slate-50 dark:bg-navy-800 overflow-hidden flex-shrink-0 border dark:border-navy-700">
+                                            ${p.image ? `<img src="${p.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-[7px] font-black text-slate-200">WIP</div>`}
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <h4 class="font-black text-[10px] truncate text-slate-900 dark:text-white uppercase leading-tight">${p.productName}</h4>
+                                            <p class="text-[9px] font-bold truncate text-slate-400 mt-1 uppercase leading-none">${p.client}</p>
+                                        </div>
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>`;
+                }
+                board.appendChild(col);
+            });
+            lucide.createIcons();
+        }
+
+        function changeGanttMonth(delta) {
+            state.ganttDate.setMonth(state.ganttDate.getMonth() + delta);
+            renderGantt();
+        }
+
+        function renderGantt() {
+            const sidebar = document.getElementById('gantt-sidebar');
+            const header = document.getElementById('gantt-header');
+            const body = document.getElementById('gantt-body');
+            const monthLabel = document.getElementById('gantt-month-year');
+            if(!sidebar || !header || !body || !monthLabel) return;
+
+            sidebar.innerHTML = ''; header.innerHTML = ''; body.innerHTML = '';
+            
+            const currentYear = state.ganttDate.getFullYear();
+            const currentMonth = state.ganttDate.getMonth();
+            monthLabel.innerText = `${state.ganttDate.toLocaleString('default', { month: 'long' })} ${currentYear}`;
+
+            const startDate = new Date(currentYear, currentMonth, 1);
+            const daysCount = 35;
+            const timelineDates = [];
+
+            for (let i = 0; i < daysCount; i++) {
+                const d = new Date(startDate); d.setDate(startDate.getDate() + i);
+                timelineDates.push(d);
+                
+                const isToday = d.toDateString() === new Date().toDateString();
+                const isSunday = d.getDay() === 0;
+                
+                let monthMarker = '';
+                if (d.getDate() === 1) {
+                    const monthName = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                    monthMarker = `<div class="absolute top-1 left-2 text-[8px] font-black uppercase text-gold-600 tracking-[0.2em] whitespace-nowrap z-10">${monthName}</div>`;
+                }
+
+                header.innerHTML += `
+                    <div class="gantt-cell flex flex-col items-center justify-end pb-2 relative ${isToday ? 'gantt-today' : ''} ${isSunday ? 'gantt-holiday' : ''}">
+                        ${monthMarker}
+                        <span class="text-[8px] font-black uppercase ${isSunday ? 'text-red-400' : 'text-slate-400'} opacity-60 leading-none mb-1">${d.toLocaleDateString('en-US', {weekday:'short'})[0]}</span>
+                        <span class="text-[10px] font-black ${isToday ? 'text-gold-500' : isSunday ? 'text-red-500' : 'text-slate-800 dark:text-slate-300'}">${d.getDate()}</span>
+                    </div>`;
+            }
+
+            const filtered = state.products.filter(p => {
+                const q = state.searchQuery.toLowerCase();
+                const matchesSearch = p.productName.toLowerCase().includes(q) || p.jobNo.toString().includes(q) || p.client.toLowerCase().includes(q);
+                const matchesClient = !state.ganttClientFilter || p.client === state.ganttClientFilter;
+                const matchesShipped = state.showShipped || !p.shipped;
+                return matchesSearch && matchesClient && matchesShipped;
+            });
+
+            filtered.forEach(p => {
+                const rowTitle = document.createElement('div');
+                rowTitle.className = 'gantt-row px-5 flex items-center gap-3 hover:bg-gold-500/5 cursor-pointer transition-colors group';
+                rowTitle.onclick = () => showProductDetails(p.id);
+                rowTitle.innerHTML = `
+                    <div class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-navy-800 flex-shrink-0 overflow-hidden border dark:border-navy-700 shadow-xs">
+                        ${p.image ? `<img src="${p.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-[7px] font-black text-slate-400">#${p.jobNo}</div>`}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-[9px] font-black text-slate-900 dark:text-slate-100 truncate uppercase tracking-tight leading-none text-left">${p.productName}</p>
+                        <p class="text-[7px] font-black text-slate-400 truncate uppercase mt-1 opacity-70 text-left">${p.currentStage} ${p.shipped ? '(SHIPPED)' : ''}</p>
+                    </div>`;
+                sidebar.appendChild(rowTitle);
+
+                const rowGrid = document.createElement('div');
+                rowGrid.className = 'gantt-row relative';
+                timelineDates.forEach(d => {
+                    const isToday = d.toDateString() === new Date().toDateString();
+                    const isSunday = d.getDay() === 0;
+                    rowGrid.innerHTML += `<div class="gantt-cell ${isToday ? 'gantt-today' : ''} ${isSunday ? 'gantt-holiday' : ''}"></div>`;
+                });
+
+                const barLayer = document.createElement('div');
+                barLayer.className = 'absolute inset-0 flex items-center pointer-events-none px-[0.5px]';
+                const shipDate = p.shippingDate ? new Date(p.shippingDate) : null;
+                const createdDate = new Date(parseInt(p.id)); 
+                
+                if (shipDate) {
+                    const barStart = Math.max(0, Math.floor((createdDate - startDate) / 86400000));
+                    const barEnd = Math.floor((shipDate - startDate) / 86400000);
+                    if (barEnd >= 0 && barStart < daysCount) {
+                        const width = (Math.min(daysCount, barEnd) - Math.max(0, barStart) + 1) * 48;
+                        const left = Math.max(0, barStart) * 48;
+                        const bar = document.createElement('div');
+                        bar.className = 'h-5 rounded-full bg-slate-100 dark:bg-navy-800 border dark:border-navy-700 flex overflow-hidden pointer-events-auto shadow-md';
+                        bar.style.width = `${width}px`; bar.style.marginLeft = `${left}px`;
+                        
+                        const sortedStages = STAGES.filter(s => p.activeStages[s]);
+                        let lastDate = createdDate;
+                        sortedStages.forEach(s => {
+                            const dDate = p.deadlines[s] ? new Date(p.deadlines[s]) : null;
+                            if (dDate) {
+                                const segmentDays = Math.max(0.5, (dDate - lastDate) / 86400000);
+                                const segmentWidth = (segmentDays / (daysCount)) * (daysCount * 48);
+                                const segment = document.createElement('div');
+                                const currentIdx = STAGES.indexOf(p.currentStage);
+                                const stageIdx = STAGES.indexOf(s);
+                                const isPassed = stageIdx < currentIdx;
+                                const isCurrent = s === p.currentStage;
+                                
+                                segment.className = `h-full transition-all group/seg relative flex items-center justify-center ${isPassed ? 'bg-gold-500/20' : isCurrent ? 'bg-gold-500 shadow-inner' : 'bg-slate-300 dark:bg-navy-700'}`;
+                                segment.style.width = `${segmentWidth}px`;
+                                segment.innerHTML = `
+                                    <span class="text-[6px] font-black text-white uppercase truncate px-1 pointer-events-none opacity-100 transition-opacity">${s}</span>
+                                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/seg:block z-30 bg-navy-950 text-white text-[7px] px-2 py-1 rounded shadow-xl whitespace-nowrap font-black uppercase tracking-widest border border-gold-500/20">${s}: ${dDate.toLocaleDateString('en-GB')}</div>`;
+                                bar.appendChild(segment);
+                                lastDate = dDate;
+                            }
+                        });
+                        barLayer.appendChild(bar);
+                    }
+                }
+                rowGrid.appendChild(barLayer); body.appendChild(rowGrid);
+            });
+        }
+
+        window.updateStageDeadline = function(productId, stage, newDate) {
+            const p = state.products.find(x => x.id === productId);
+            if (!p) return;
+            
+            const oldDate = p.deadlines[stage] || 'None';
+            if (oldDate === newDate) return;
+            
+            p.deadlines[stage] = newDate;
+            p.history.unshift({
+                from: stage,
+                to: stage,
+                timestamp: new Date().toLocaleString(),
+                user: state.currentUser || 'admin',
+                note: `[${stage}] Deadline changed from ${oldDate} to ${newDate}`
+            });
+            
+            save();
+            refreshCurrentView();
+            showProductDetails(productId); 
+        };
+
+        window.toggleShipped = function(productId) {
+            const p = state.products.find(x => x.id === productId);
+            if (!p) return;
+            
+            p.shipped = !p.shipped;
+            p.history.unshift({
+                from: p.currentStage,
+                to: p.currentStage,
+                timestamp: new Date().toLocaleString(),
+                user: state.currentUser || 'admin',
+                note: p.shipped ? 'Marked as SHIPPED' : 'Unmarked from SHIPPED'
+            });
+            
+            save();
+            refreshCurrentView();
+            showProductDetails(productId);
+        };
+
+        function showProductDetails(id) {
+            const p = state.products.find(p => p.id === id);
+            if (!p) return;
+            const delayed = isStageDelayed(p);
+            const content = document.getElementById('detail-content');
+            if(!content) return;
+            
+            const getEntryDate = (stage) => {
+                const move = p.history.find(h => h.to === stage && (h.from !== h.to));
+                return move ? move.timestamp.split(',')[0] : 'N/A';
+            };
+
+            const originalStartDept = p.history.length > 0 ? (p.history[p.history.length-1].to || 'RPT') : 'RPT';
+
+            content.innerHTML = `
+                <div class="flex flex-col md:flex-row max-h-[85vh] text-slate-900 dark:text-white text-left">
+                    <div class="w-full md:w-5/12 bg-slate-50 dark:bg-navy-800 p-8 flex flex-col items-center justify-start border-r dark:border-navy-700">
+                        <div class="w-full aspect-square bg-white dark:bg-navy-950 rounded-2xl shadow-lg mb-8 overflow-hidden flex items-center justify-center border dark:border-navy-700">
+                            ${p.image ? `<img src="${p.image}" class="w-full h-full object-contain">` : `<i data-lucide="package" class="w-16 h-16 text-slate-200"></i>`}
+                        </div>
+                        <div class="w-full p-4 bg-white dark:bg-navy-950 rounded-xl border dark:border-navy-700 shadow-sm text-center mb-6">
+                            <p class="text-[8px] uppercase font-black text-slate-400 mb-1.5 tracking-widest text-left">Tech Remarks</p>
+                            <p class="text-[11px] font-bold italic leading-relaxed text-slate-600 dark:text-slate-300 text-left">${p.remark || 'N/A'}</p>
+                        </div>
+                        
+                        <div class="w-full flex-1 min-h-0 flex flex-col">
+                            <p class="text-[8px] font-black uppercase text-slate-400 mb-2 tracking-widest px-1 text-left">Audit Logs</p>
+                            <div class="space-y-1.5 overflow-y-auto no-scrollbar flex-1 pr-1">
+                                ${p.history.map(h => `
+                                    <div class="p-2 rounded-lg bg-white/50 dark:bg-navy-900/50 border dark:border-navy-700 flex flex-col gap-0.5 text-[9px] text-left">
+                                        <div class="flex justify-between items-center">
+                                            <div class="font-bold uppercase flex items-center gap-1">
+                                                ${h.from === h.to ? `<span class="text-blue-500">Edit</span>` : `<span class="text-slate-400">${h.from || 'Start'}</span> <i data-lucide="arrow-right" class="inline w-2 h-2 mx-1"></i> <span class="text-gold-500">${h.to}</span>`}
+                                            </div>
+                                            <div class="text-[8px] opacity-60">${h.timestamp}</div>
+                                        </div>
+                                        ${h.note ? `<p class="text-[8px] italic text-slate-500 dark:text-slate-400 border-t dark:border-navy-700 mt-1 pt-1">${h.note}</p>` : ''}
+                                        <p class="text-[7px] text-right mt-1 opacity-40 uppercase font-black tracking-tighter">User: ${h.user || 'System'}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <button onclick="event.stopPropagation(); deleteProduct('${p.id}')" class="mt-8 w-full py-2 bg-red-600/10 text-red-600 rounded-lg font-black text-[8px] uppercase tracking-widest border border-red-100 dark:border-red-900/30 hover:bg-red-600 hover:text-white transition-all">Delete Job</button>
+                    </div>
+                    <div class="w-full md:w-7/12 p-8 flex flex-col bg-white dark:bg-navy-900 overflow-y-auto no-scrollbar">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-2 py-0.5 rounded bg-gold-500 text-white text-[9px] font-black uppercase tracking-widest">#${p.jobNo}</span>
+                                    ${p.isExpress === 'Yes' ? '<span class="px-2 py-0.5 rounded bg-red-600 text-white text-[9px] font-black uppercase tracking-widest">Express</span>' : ''}
+                                    ${p.shipped ? '<span class="px-2 py-0.5 rounded bg-green-500 text-white text-[9px] font-black uppercase tracking-widest">Shipped</span>' : ''}
+                                </div>
+                                <h2 class="text-xl font-black uppercase tracking-tight leading-none text-slate-900 dark:text-white">${p.productName}</h2>
+                                <p class="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">Account: <span class="text-gold-600">${p.client}</span></p>
+                            </div>
+                            <button onclick="toggleModal('detail-modal', false)" class="p-1 hover:bg-slate-100 dark:hover:bg-navy-800 rounded transition-colors"><i data-lucide="x" class="w-5 h-5 text-slate-400"></i></button>
+                        </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+                            <div class="p-3 bg-slate-50 dark:bg-navy-800/50 rounded-xl border dark:border-navy-800">
+                                <p class="text-[7px] font-black text-slate-400 uppercase mb-1">Gold KT</p>
+                                <p class="text-[10px] font-black dark:text-white uppercase leading-none">${p.goldKt}</p>
+                            </div>
+                            <div class="p-3 bg-slate-50 dark:bg-navy-800/50 rounded-xl border dark:border-navy-800">
+                                <p class="text-[7px] font-black text-slate-400 uppercase mb-1">Dia Type</p>
+                                <p class="text-[10px] font-black dark:text-white uppercase leading-none">${p.diamondType}</p>
+                            </div>
+                            <div class="p-3 bg-slate-50 dark:bg-navy-800/50 rounded-xl border dark:border-navy-800">
+                                <p class="text-[7px] font-black text-slate-400 uppercase mb-1">Design</p>
+                                <p class="text-[10px] font-black dark:text-white uppercase leading-none truncate">${p.designMaster || '-'}</p>
+                            </div>
+                            <div class="p-3 bg-slate-50 dark:bg-navy-800/50 rounded-xl border dark:border-navy-800">
+                                <p class="text-[7px] font-black text-slate-400 uppercase mb-1">Entry Point</p>
+                                <p class="text-[10px] font-black dark:text-white uppercase leading-none truncate">${originalStartDept}</p>
+                            </div>
+                            <div class="p-3 bg-slate-50 dark:bg-navy-800/50 rounded-xl border dark:border-navy-800">
+                                <p class="text-[7px] font-black text-slate-400 uppercase mb-1">Status</p>
+                                <p class="text-[10px] font-black ${delayed ? 'text-red-500' : 'text-green-500'} uppercase leading-none">${p.shipped ? 'Shipped' : delayed ? 'Delayed' : 'Active'}</p>
+                            </div>
+                            <div class="p-3 bg-slate-50 dark:bg-navy-800/50 rounded-xl border dark:border-navy-800">
+                                <p class="text-[7px] font-black text-slate-400 uppercase mb-1">Current Phase</p>
+                                <p class="text-[10px] font-black text-gold-500 uppercase leading-none truncate">${p.currentStage}</p>
+                            </div>
+                        </div>
+
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-[10px] font-black uppercase text-gold-600 tracking-widest flex items-center gap-2"><i data-lucide="activity" class="w-3 h-3"></i> Stage Progress</h3>
+                                <div class="text-[8px] font-bold text-slate-400 uppercase flex gap-5 pr-2"><span>Entry</span><span>Target</span></div>
+                            </div>
+                            <div class="space-y-2 mb-8">
+                                ${STAGES.filter(s => p.activeStages[s]).map(s => {
+                                    const isCurrent = s === p.currentStage;
+                                    const passDate = getEntryDate(s);
+                                    const targetDate = p.deadlines[s] || '';
+                                    return `
+                                    <div class="p-2 ${isCurrent ? 'bg-gold-500/10 border-gold-500/30' : 'bg-slate-50 dark:bg-navy-800/30 border dark:border-navy-700'} border rounded-xl flex justify-between items-center transition-all">
+                                        <span class="text-[8px] font-black uppercase ${isCurrent ? 'text-gold-600' : 'text-slate-500'} tracking-widest">${s}</span>
+                                        <div class="flex gap-4 text-[9px] font-black">
+                                            <span class="${passDate !== 'N/A' ? 'text-blue-500' : 'text-slate-300'}">${passDate}</span>
+                                            <input type="date" value="${targetDate}" 
+                                                   onchange="updateStageDeadline('${p.id}', '${s}', this.value)"
+                                                   class="bg-white dark:bg-navy-800 border-none rounded p-1 text-[10px] font-black outline-none focus:ring-1 focus:ring-gold-500 w-24 cursor-pointer">
+                                        </div>
+                                    </div>`;
+                                }).join('')}
+                            </div>
+                            
+                            <!-- Shipped Toggle Logic -->
+                            ${p.currentStage === "Quality Control" ? `
+                                <div class="p-4 bg-slate-50 dark:bg-navy-800/50 border-2 border-dashed border-gold-500/30 rounded-2xl mb-8 flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="p-2 bg-gold-500 text-white rounded-lg"><i data-lucide="package-check" class="w-4 h-4"></i></div>
+                                        <div>
+                                            <p class="text-[10px] font-black uppercase text-slate-700 dark:text-white">Ready for Shipping?</p>
+                                            <p class="text-[8px] text-slate-400">Marking as shipped hides it from default views.</p>
+                                        </div>
+                                    </div>
+                                    <button onclick="toggleShipped('${p.id}')" class="px-4 py-2 ${p.shipped ? 'bg-red-500 hover:bg-red-600' : 'bg-gold-600 hover:bg-gold-700'} text-white rounded-lg font-black uppercase text-[9px] tracking-widest transition-all">
+                                        ${p.shipped ? 'Undo Ship' : 'Mark Shipped'}
+                                    </button>
+                                </div>
+                            ` : ''}
+
+                            <div class="p-4 bg-navy-950 text-white dark:bg-gold-600 rounded-xl flex items-center justify-between shadow-xl mt-auto">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="truck" class="w-5 h-5 opacity-60"></i>
+                                    <div>
+                                        <p class="text-[7px] font-black uppercase tracking-widest opacity-60">Shipment Commitment</p>
+                                        <p class="text-[12px] font-black uppercase tracking-widest">${p.shippingDate ? new Date(p.shippingDate).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : 'OPEN'}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-[7px] font-black uppercase tracking-widest opacity-60">Metadata</p>
+                                    <p class="text-[10px] font-black uppercase tracking-widest">${p.goldKt} • ${p.diamondType}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            lucide.createIcons();
+            toggleModal('detail-modal', true);
+        }
+
+        // --- Shared Logic ---
+        function applyTheme() {
+            if (state.isDarkMode) {
+                document.documentElement.classList.add('dark');
+                ['theme-icon-login', 'theme-icon-main'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if(el) el.setAttribute('data-lucide', 'sun');
+                });
+            } else {
+                document.documentElement.classList.remove('dark');
+                ['theme-icon-login', 'theme-icon-main'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if(el) el.setAttribute('data-lucide', 'moon');
+                });
+            }
+            localStorage.setItem('erp_theme', state.isDarkMode ? 'dark' : 'light');
+            lucide.createIcons();
+        }
+
+        function toggleTheme() { state.isDarkMode = !state.isDarkMode; applyTheme(); }
+
+        function toggleModal(id, show) { 
+            const m = document.getElementById(id); 
+            if (show) { m.classList.remove('hidden'); if(id === 'report-modal') generateReport(); } 
+            else { m.classList.add('hidden'); }
+        }
+
+        function changeMonth(delta) { state.calendarDate.setMonth(state.calendarDate.getMonth() + delta); renderCalendar(); }
+        function handleCalendarClientFilter(val) { state.calendarClientFilter = val; renderCalendar(); }
+        function handleGanttClientFilter(val) { state.ganttClientFilter = val; renderGantt(); }
+        
+        function populateClientFilters() {
+            const calSelect = document.getElementById('calendar-client-filter');
+            const ganttSelect = document.getElementById('gantt-client-filter');
+            const clients = [...new Set(state.products.map(p => p.client))].sort();
+            
+            if(calSelect) {
+                calSelect.innerHTML = '<option value="">Filter Accounts</option>';
+                clients.forEach(client => {
+                    const opt = document.createElement('option');
+                    opt.value = client; opt.innerText = client;
+                    if (client === state.calendarClientFilter) opt.selected = true;
+                    calSelect.appendChild(opt);
+                });
+            }
+            if(ganttSelect) {
+                ganttSelect.innerHTML = '<option value="">All Accounts</option>';
+                clients.forEach(client => {
+                    const opt = document.createElement('option');
+                    opt.value = client; opt.innerText = client;
+                    if (client === state.ganttClientFilter) opt.selected = true;
+                    ganttSelect.appendChild(opt);
+                });
+            }
+        }
+
+        function renderCalendar() {
+            const daysContainer = document.getElementById('calendar-days');
+            const monthLabel = document.getElementById('calendar-month-year');
+            if(!daysContainer || !monthLabel) return;
+            daysContainer.innerHTML = '';
+            const year = state.calendarDate.getFullYear();
+            const month = state.calendarDate.getMonth();
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            monthLabel.innerText = `${state.calendarDate.toLocaleString('default', { month: 'long' })} ${year}`;
+
+            for (let i = 0; i < firstDay; i++) {
+                const pad = document.createElement('div');
+                pad.className = 'h-44 border-r border-b dark:border-navy-800 bg-slate-50/50 dark:bg-navy-950/20';
+                daysContainer.appendChild(pad);
+            }
+
+            const today = new Date(); today.setHours(0,0,0,0);
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayEl = document.createElement('div');
+                const cellDate = new Date(year, month, day);
+                const isCurrentDay = cellDate.toDateString() === today.toDateString();
+                const isSunday = cellDate.getDay() === 0;
+
+                dayEl.className = `h-44 border-r border-b dark:border-navy-800 p-2 overflow-y-auto bg-white dark:bg-navy-900 hover:bg-slate-50 transition-all cursor-default ${isCurrentDay ? 'ring-2 ring-gold-500 inset z-10' : ''} ${isSunday ? 'bg-red-50/30 dark:bg-red-950/10' : ''}`;
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dailyProducts = state.products.filter(p => p.shippingDate === dateStr && (!state.calendarClientFilter || p.client === state.calendarClientFilter) && (state.showShipped || !p.shipped));
+                
+                dayEl.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[11px] font-black ${isSunday ? 'text-red-500' : dailyProducts.length > 0 ? 'text-gold-500' : 'text-slate-400'}">${day}</span>
+                        ${dailyProducts.length > 0 ? `<span class="bg-navy-900 dark:bg-gold-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md">${dailyProducts.length}</span>` : ''}
+                    </div>
+                    <div class="space-y-2">
+                        ${dailyProducts.map(p => `
+                            <button onclick="showProductDetails('${p.id}')" class="w-full text-left p-1 rounded bg-slate-50 dark:bg-navy-800 text-[8px] font-bold leading-none dark:text-slate-200 truncate border border-transparent hover:border-gold-500 shadow-xs flex items-center gap-2">
+                                ${p.image ? `<img src="${p.image}" class="w-10 h-10 rounded object-cover flex-shrink-0 shadow-sm border border-slate-200 dark:border-navy-700">` : `<div class="w-10 h-10 rounded bg-slate-200 dark:bg-navy-700 flex items-center justify-center text-[5px]">IMG</div>`}
+                                <span class="truncate font-black">#${p.jobNo} ${p.productName}</span>
+                            </button>
+                        `).join('')}
+                    </div>`;
+                daysContainer.appendChild(dayEl);
+            }
+        }
+
+        function isStageDelayed(product) {
+            const deadline = product.deadlines[product.currentStage];
+            if (!deadline) return false;
+            const d = new Date(deadline); d.setHours(23,59,59);
+            return d < new Date();
+        }
+
+        function generateReport() {
+            const container = document.getElementById('report-content');
+            if (!container) return;
+            const stageSummary = STAGES.map(s => ({ name: s, count: state.products.filter(p => p.currentStage === s).length }));
+            container.innerHTML = `
+                <div class="grid grid-cols-2 gap-4 mb-6 text-center text-slate-900 dark:text-white text-left">
+                    <div class="p-5 rounded-2xl bg-gold-500/5 border border-gold-500/20 shadow-xs">
+                        <p class="text-[8px] uppercase font-black text-gold-600 mb-1 tracking-widest">Active Jobs</p>
+                        <p class="text-2xl font-black text-slate-950 dark:text-white leading-none">${state.products.filter(p => !p.shipped).length}</p>
+                    </div>
+                    <div class="p-5 rounded-2xl bg-red-600/5 border border-red-600/20 shadow-xs">
+                        <p class="text-[8px] uppercase font-black text-red-600 mb-1 tracking-widest">Delays</p>
+                        <p class="text-2xl font-black text-slate-950 dark:text-white leading-none">${state.products.filter(p => !p.shipped && isStageDelayed(p)).length}</p>
+                    </div>
+                </div>
+                <div class="rounded-xl border dark:border-navy-800 overflow-hidden bg-white dark:bg-navy-950">
+                    <table class="w-full text-left text-[11px] text-slate-900 dark:text-white">
+                        <thead><tr class="bg-slate-50 dark:bg-navy-900 border-b dark:border-navy-800"><th class="px-6 py-3 font-black uppercase text-slate-400 text-[8px]">Department</th><th class="px-6 py-3 text-right font-black uppercase text-slate-400 text-[8px]">Jobs</th></tr></thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-navy-800">
+                            ${stageSummary.map(s => `<tr class="dark:text-slate-200 transition-colors hover:bg-gold-500/5"><td class="px-6 py-3 font-bold uppercase tracking-tight">${s.name}</td><td class="px-6 py-3 text-right font-black text-gold-600">${s.count}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+        }
+
+        function save() { localStorage.setItem('erp_products_v6', JSON.stringify(state.products)); }
+
+        function deleteProduct(id) {
+            if (confirm("Delete this record permanently?")) {
+                state.products = state.products.filter(p => p.id !== id);
+                save(); 
+                refreshCurrentView();
+                toggleModal('detail-modal', false);
+            }
+        }
+
+        function setupEventListeners() {
+            const loginForm = document.getElementById('login-form');
+            if(loginForm) {
+                loginForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    if (document.getElementById('username').value === 'admin' && document.getElementById('password').value === 'admin123') {
+                        state.currentUser = 'admin';
+                        document.getElementById('login-screen').classList.add('hidden');
+                        document.getElementById('app-ui').classList.remove('hidden');
+                        setView('kanban');
+                    } else {
+                        const err = document.getElementById('login-error');
+                        if(err) err.classList.remove('hidden');
+                        setTimeout(() => { if(err) err.classList.add('hidden'); }, 2000);
+                    }
+                });
+            }
+
+            const productForm = document.getElementById('product-form');
+            if(productForm) {
+                productForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const deadlines = {}; const activeStages = {};
+                    STAGES.forEach(s => {
+                        const safeId = s.replace(/[^a-zA-Z0-9]/g, '');
+                        const chk = document.getElementById(`check-${safeId}`);
+                        const dln = document.getElementById(`deadline-${safeId}`);
+                        activeStages[s] = chk ? chk.checked : false;
+                        deadlines[s] = dln ? dln.value : '';
+                    });
+                    const startStage = document.getElementById('field-startDepartment').value;
+                    const n = {
+                        id: Date.now().toString(),
+                        jobNo: document.getElementById('field-jobNo').value,
+                        productName: document.getElementById('field-productName').value,
+                        remark: document.getElementById('field-remark').value,
+                        goldKt: document.getElementById('field-goldKt').value,
+                        diamondType: document.getElementById('field-diamondType').value,
+                        client: document.getElementById('field-client').value,
+                        shippingDate: document.getElementById('field-shippingDate').value,
+                        isExpress: document.getElementById('field-isExpress').value,
+                        designMaster: document.getElementById('field-designMaster').value,
+                        image: state.productImage,
+                        deadlines, activeStages, currentStage: startStage,
+                        shipped: false,
+                        history: [{ from: '', to: startStage, timestamp: new Date().toLocaleString(), user: state.currentUser || 'admin', note: 'Project Entry' }]
+                    };
+                    state.products.unshift(n); save(); toggleModal('product-modal', false); e.target.reset(); clearImage(); renderBoard();
+                });
+            }
+
+            const searchInput = document.getElementById('search-input');
+            if(searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    state.searchQuery = e.target.value;
+                    refreshCurrentView();
+                });
+            }
+
+            const imageInput = document.getElementById('image-input');
+            if(imageInput) {
+                imageInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            state.productImage = ev.target.result;
+                            const prev = document.getElementById('image-preview');
+                            if(prev) prev.src = state.productImage;
+                            const container = document.getElementById('image-preview-container');
+                            if(container) container.classList.remove('hidden');
+                            const lbl = document.getElementById('upload-label');
+                            if(lbl) lbl.classList.add('hidden');
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+        }
+
+        function initiateMove(productId, targetStage) {
+            const p = state.products.find(p => p.id === productId);
+            if (!p || p.currentStage === targetStage) return;
+            if (!p.activeStages[targetStage]) return;
+            state.pendingMove = { productId, targetStage };
+            const targetEl = document.getElementById('move-modal-target');
+            if(targetEl) targetEl.innerText = targetStage;
+            toggleModal('confirm-modal', true);
+        }
+
+        function executeMove() {
+            if(!state.pendingMove) return;
+            const { productId, targetStage } = state.pendingMove;
+            const p = state.products.find(x => x.id === productId);
+            if(p) {
+                p.history.unshift({ from: p.currentStage, to: targetStage, timestamp: new Date().toLocaleString(), user: state.currentUser || 'admin' });
+                p.currentStage = targetStage;
+                save(); 
+            }
+            toggleModal('confirm-modal', false); 
+            state.pendingMove = null;
+            renderBoard();
+        }
+
+        function cancelMove() { toggleModal('confirm-modal', false); state.pendingMove = null; }
+        function clearImage() { 
+            state.productImage = null; 
+            const container = document.getElementById('image-preview-container');
+            if(container) container.classList.add('hidden'); 
+            const lbl = document.getElementById('upload-label');
+            if(lbl) lbl.classList.remove('hidden'); 
+        }
+        function logout() { state.currentUser = null; document.getElementById('login-screen').classList.remove('hidden'); document.getElementById('app-ui').classList.add('hidden'); }
+
+        window.onload = function() {
+            initApp();
+            setupEventListeners();
+        };
+    </script>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+<script>
+  // Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyC7Q77rkrfcbKl6spOs5rqjmGHiZq3Sys8",
+    authDomain: "mj-advance-wip.firebaseapp.com",
+    projectId: "mj-advance-wip",
+    storageBucket: "mj-advance-wip.firebasestorage.app",
+    messagingSenderId: "757293283486",
+    appId: "1:757293283486:web:d9343a3c3c73b0ee6d238f",
+    measurementId: "G-4X43J3RZJE",
+    databaseURL: "https://mj-advance-wip-default-rtdb.firebaseio.com"
+  };
+
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+
+  // Analytics (optional)
+  firebase.analytics();
+
+  // Realtime Database reference
+  const db = firebase.database();
+</script>
+</body>
+</html>
