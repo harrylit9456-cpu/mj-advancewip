@@ -6,6 +6,12 @@
     <title>MJ Advance WIP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -125,7 +131,7 @@
                     <input type="password" id="password" class="w-full p-3 rounded-xl border border-slate-200 focus:ring-1 focus:ring-gold-500 outline-none bg-slate-50 dark:bg-navy-800 dark:border-navy-700 font-bold" required>
                 </div>
                 <p id="login-error" class="text-red-600 text-[9px] font-black hidden text-center italic uppercase tracking-tighter">Auth Failed.</p>
-                <button type="submit" class="w-full bg-gold-600 hover:bg-gold-700 text-white font-black py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest active:scale-95">
+                <button type="submit" id="login-button" class="w-full bg-gold-600 hover:bg-gold-700 text-white font-black py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest active:scale-95">
                     Log In <i data-lucide="arrow-right" class="w-4 h-4"></i>
                 </button>
             </form>
@@ -344,10 +350,28 @@
     </div>
 
     <script>
+        // --- FIREBASE INITIALIZATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyC7Q77rkrfcbKl6spOs5rqjmGHiZq3Sys8",
+            authDomain: "mj-advance-wip.firebaseapp.com",
+            projectId: "mj-advance-wip",
+            storageBucket: "mj-advance-wip.firebasestorage.app",
+            messagingSenderId: "757293283486",
+            appId: "1:757293283486:web:d9343a3c3c73b0ee6d238f",
+            measurementId: "G-4X43J3RZJE"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mj-advance-wip';
+        // Path Rule: /artifacts/{appId}/public/data/{collectionName}
+        const collectionRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('products');
+
         const STAGES = ["RPT", "Casting", "Filing-Assembling", "RB, CT, Dia Size", "Diamond Procurement", "Setting", "Fitting and Polish", "Rhodium and After finish", "Meena", "Quality Control"];
 
         let state = {
-            products: JSON.parse(localStorage.getItem('erp_products_v6')) || [],
+            products: [], // Loaded from Firebase
             isDarkMode: localStorage.getItem('erp_theme') !== 'light',
             currentUser: null,
             searchQuery: '',
@@ -397,10 +421,25 @@
             lucide.createIcons();
         }
 
+        // --- DATA SYNCING ---
+        function startDataSync() {
+            // Real-time listener
+            collectionRef.onSnapshot((snapshot) => {
+                state.products = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                refreshCurrentView();
+            }, (error) => {
+                console.error("Firestore sync error: ", error);
+            });
+        }
+
         function refreshCurrentView() {
             if (state.currentView === 'kanban') renderBoard();
             else if (state.currentView === 'gantt') renderGantt();
             else renderCalendar();
+            lucide.createIcons();
         }
 
         function toggleStageCollapse(stage, hasProducts) {
@@ -441,10 +480,8 @@
                 activeBtn.classList.remove('text-slate-500', 'dark:text-slate-400');
             }
 
-            if (view === 'kanban') renderBoard();
-            else if (view === 'calendar') { populateClientFilters(); renderCalendar(); }
-            else if (view === 'gantt') { populateClientFilters(); renderGantt(); }
-            lucide.createIcons();
+            refreshCurrentView();
+            if (view === 'calendar' || view === 'gantt') populateClientFilters();
         }
 
         function renderBoard() {
@@ -631,15 +668,16 @@
             });
         }
 
-        window.updateStageDeadline = function(productId, stage, newDate) {
+        window.updateStageDeadline = async function(productId, stage, newDate) {
             const p = state.products.find(x => x.id === productId);
             if (!p) return;
             
             const oldDate = p.deadlines[stage] || 'None';
             if (oldDate === newDate) return;
             
-            p.deadlines[stage] = newDate;
-            p.history.unshift({
+            const deadlines = {...p.deadlines, [stage]: newDate};
+            const history = [...p.history];
+            history.unshift({
                 from: stage,
                 to: stage,
                 timestamp: new Date().toLocaleString(),
@@ -647,27 +685,30 @@
                 note: `[${stage}] Deadline changed from ${oldDate} to ${newDate}`
             });
             
-            save();
-            refreshCurrentView();
-            showProductDetails(productId); 
+            await collectionRef.doc(productId).update({ deadlines, history });
+            // Detail modal will refresh automatically via snapshot listener if open
+            if (document.getElementById('detail-modal').classList.contains('hidden') === false) {
+                 setTimeout(() => showProductDetails(productId), 100);
+            }
         };
 
-        window.toggleShipped = function(productId) {
+        window.toggleShipped = async function(productId) {
             const p = state.products.find(x => x.id === productId);
             if (!p) return;
             
-            p.shipped = !p.shipped;
-            p.history.unshift({
+            const history = [...p.history];
+            history.unshift({
                 from: p.currentStage,
                 to: p.currentStage,
                 timestamp: new Date().toLocaleString(),
                 user: state.currentUser || 'admin',
-                note: p.shipped ? 'Marked as SHIPPED' : 'Unmarked from SHIPPED'
+                note: !p.shipped ? 'Marked as SHIPPED' : 'Unmarked from SHIPPED'
             });
             
-            save();
-            refreshCurrentView();
-            showProductDetails(productId);
+            await collectionRef.doc(productId).update({ shipped: !p.shipped, history });
+            if (document.getElementById('detail-modal').classList.contains('hidden') === false) {
+                 setTimeout(() => showProductDetails(productId), 100);
+            }
         };
 
         function showProductDetails(id) {
@@ -948,38 +989,51 @@
                 </div>`;
         }
 
-        function save() { localStorage.setItem('erp_products_v6', JSON.stringify(state.products)); }
-
-        function deleteProduct(id) {
-            if (confirm("Delete this record permanently?")) {
-                state.products = state.products.filter(p => p.id !== id);
-                save(); 
-                refreshCurrentView();
-                toggleModal('detail-modal', false);
-            }
-        }
-
-        function setupEventListeners() {
+        // --- AUTHENTICATION & LOGIN ---
+        async function setupEventListeners() {
             const loginForm = document.getElementById('login-form');
             if(loginForm) {
-                loginForm.addEventListener('submit', (e) => {
+                loginForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
-                    if (document.getElementById('username').value === 'admin' && document.getElementById('password').value === 'admin123') {
-                        state.currentUser = 'admin';
-                        document.getElementById('login-screen').classList.add('hidden');
-                        document.getElementById('app-ui').classList.remove('hidden');
-                        setView('kanban');
+                    const username = document.getElementById('username').value;
+                    const password = document.getElementById('password').value;
+                    const loginBtn = document.getElementById('login-button');
+
+                    // Keeping original local check concept
+                    if (username === 'admin' && password === 'admin123') {
+                        loginBtn.innerText = "Connecting...";
+                        try {
+                            // Rule 3: Auth Before Queries
+                            await auth.signInAnonymously();
+                            state.currentUser = 'admin';
+                            document.getElementById('login-screen').classList.add('hidden');
+                            document.getElementById('app-ui').classList.remove('hidden');
+                            startDataSync(); // Start syncing after auth
+                            setView('kanban');
+                        } catch (err) {
+                            console.error("Firebase auth error:", err);
+                            showLoginError("Cloud link failed.");
+                        } finally {
+                            loginBtn.innerText = "Log In";
+                        }
                     } else {
-                        const err = document.getElementById('login-error');
-                        if(err) err.classList.remove('hidden');
-                        setTimeout(() => { if(err) err.classList.add('hidden'); }, 2000);
+                        showLoginError("Auth Failed.");
                     }
                 });
             }
 
+            function showLoginError(msg) {
+                const err = document.getElementById('login-error');
+                if(err) {
+                    err.innerText = msg;
+                    err.classList.remove('hidden');
+                    setTimeout(() => { if(err) err.classList.add('hidden'); }, 2000);
+                }
+            }
+
             const productForm = document.getElementById('product-form');
             if(productForm) {
-                productForm.addEventListener('submit', (e) => {
+                productForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const deadlines = {}; const activeStages = {};
                     STAGES.forEach(s => {
@@ -990,8 +1044,8 @@
                         deadlines[s] = dln ? dln.value : '';
                     });
                     const startStage = document.getElementById('field-startDepartment').value;
-                    const n = {
-                        id: Date.now().toString(),
+                    
+                    const newJob = {
                         jobNo: document.getElementById('field-jobNo').value,
                         productName: document.getElementById('field-productName').value,
                         remark: document.getElementById('field-remark').value,
@@ -1006,7 +1060,13 @@
                         shipped: false,
                         history: [{ from: '', to: startStage, timestamp: new Date().toLocaleString(), user: state.currentUser || 'admin', note: 'Project Entry' }]
                     };
-                    state.products.unshift(n); save(); toggleModal('product-modal', false); e.target.reset(); clearImage(); renderBoard();
+                    
+                    // Add to Firestore
+                    await collectionRef.add(newJob);
+                    
+                    toggleModal('product-modal', false); 
+                    e.target.reset(); 
+                    clearImage(); 
                 });
             }
 
@@ -1049,18 +1109,28 @@
             toggleModal('confirm-modal', true);
         }
 
-        function executeMove() {
+        async function executeMove() {
             if(!state.pendingMove) return;
             const { productId, targetStage } = state.pendingMove;
             const p = state.products.find(x => x.id === productId);
             if(p) {
-                p.history.unshift({ from: p.currentStage, to: targetStage, timestamp: new Date().toLocaleString(), user: state.currentUser || 'admin' });
-                p.currentStage = targetStage;
-                save(); 
+                const history = [...p.history];
+                history.unshift({ from: p.currentStage, to: targetStage, timestamp: new Date().toLocaleString(), user: state.currentUser || 'admin' });
+                
+                await collectionRef.doc(productId).update({
+                    currentStage: targetStage,
+                    history: history
+                });
             }
             toggleModal('confirm-modal', false); 
             state.pendingMove = null;
-            renderBoard();
+        }
+
+        async function deleteProduct(id) {
+            if (confirm("Delete this record permanently from cloud?")) {
+                await collectionRef.doc(id).delete();
+                toggleModal('detail-modal', false);
+            }
         }
 
         function cancelMove() { toggleModal('confirm-modal', false); state.pendingMove = null; }
@@ -1071,39 +1141,17 @@
             const lbl = document.getElementById('upload-label');
             if(lbl) lbl.classList.remove('hidden'); 
         }
-        function logout() { state.currentUser = null; document.getElementById('login-screen').classList.remove('hidden'); document.getElementById('app-ui').classList.add('hidden'); }
+        function logout() { 
+            state.currentUser = null; 
+            auth.signOut();
+            document.getElementById('login-screen').classList.remove('hidden'); 
+            document.getElementById('app-ui').classList.add('hidden'); 
+        }
 
         window.onload = function() {
             initApp();
             setupEventListeners();
         };
     </script>
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
-<script>
-  // Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyC7Q77rkrfcbKl6spOs5rqjmGHiZq3Sys8",
-    authDomain: "mj-advance-wip.firebaseapp.com",
-    projectId: "mj-advance-wip",
-    storageBucket: "mj-advance-wip.firebasestorage.app",
-    messagingSenderId: "757293283486",
-    appId: "1:757293283486:web:d9343a3c3c73b0ee6d238f",
-    measurementId: "G-4X43J3RZJE",
-    databaseURL: "https://mj-advance-wip-default-rtdb.firebaseio.com"
-  };
-
-  // Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-
-  // Analytics (optional)
-  firebase.analytics();
-
-  // Realtime Database reference
-  const db = firebase.database();
-</script>
 </body>
 </html>
